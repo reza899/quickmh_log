@@ -1,0 +1,205 @@
+<!DOCTYPE html>
+<html lang="en" dir="ltr">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="description" content="A simple, private tool to track your mental health scores over time." />
+    <meta name="author" content="QuickMH Log" />
+    <meta name="theme-color" content="#8b5cf6" />
+    
+    <title>QuickMH Log</title>
+    
+    <!-- Preload critical resources -->
+    <link rel="preload" href="./css/styles.css" as="style" />
+    <link rel="preload" href="./js/app.js" as="script" />
+    
+    <!-- CSS -->
+    <link rel="stylesheet" href="./css/styles.css" />
+    
+    <!-- Security headers -->
+    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self';" />
+    <meta http-equiv="X-Content-Type-Options" content="nosniff" />
+    <meta http-equiv="X-Frame-Options" content="DENY" />
+    <meta http-equiv="X-XSS-Protection" content="1; mode=block" />
+  </head>
+  <body>
+    <header class="main-header">
+      <div class="lang-switcher">
+        <button id="lang-en" aria-label="Switch to English">EN</button>
+        <button id="lang-fa" aria-label="Switch to Persian">FA</button>
+      </div>
+      <h1 id="app-title">QuickMH Log</h1>
+      <p id="app-subtitle">A simple, private tool to track your mental health scores over time.</p>
+    </header>
+
+    <div class="container">
+      <nav role="navigation" aria-label="Main navigation">
+        <button id="nav-assessments" class="nav-btn active" type="button">Assessments</button>
+        <button id="nav-history" class="nav-btn" type="button">History</button>
+        <button id="nav-import-export" class="nav-btn" type="button">Import/Export</button>
+      </nav>
+
+      <main>
+        <!-- Assessments View -->
+        <section id="assessments-view" class="view active" aria-labelledby="assessments-heading">
+          <h2 id="assessments-heading" class="sr-only">Mental Health Assessments</h2>
+          <div class="grid" id="assessment-grid" role="list"></div>
+        </section>
+
+        <!-- Domain Detail View -->
+        <section id="domain-detail-view" class="view" aria-labelledby="detail-heading">
+          <div class="card">
+            <button
+              id="back-to-assessments-btn"
+              class="btn btn-secondary"
+              type="button"
+              style="margin-bottom: 2rem"
+              aria-label="Back to Assessments"
+            >
+              &larr; Back to Assessments
+            </button>
+            <h2 id="detail-title" id="detail-heading">Assessment Details</h2>
+            <div id="detail-content">
+              <div class="detail-section">
+                <h3 data-i18n="detail.description">Description</h3>
+                <p id="detail-description"></p>
+              </div>
+              <div class="detail-section">
+                <h3 data-i18n="detail.measures">What It Measures</h3>
+                <ul id="detail-measures"></ul>
+              </div>
+              <div class="detail-section">
+                <h3 data-i18n="detail.scoring">How to Score</h3>
+                <p id="detail-scoring"></p>
+              </div>
+              <div class="detail-section">
+                <h3 data-i18n="detail.interpretation">Score Interpretation</h3>
+                <div
+                  id="detail-interpretation"
+                  class="score-interpretation-grid"
+                ></div>
+              </div>
+              <div class="detail-section">
+                <h3 data-i18n="detail.clinicalNote">Clinical Note</h3>
+                <p id="detail-clinical-note" class="clinical-note"></p>
+              </div>
+            </div>
+
+            <div class="detail-section">
+              <h3 data-i18n="form.title">Log New Entry</h3>
+              <form id="log-entry-form" novalidate>
+                <input type="hidden" id="domain-key-input" />
+                <div class="form-group">
+                  <label for="entry-date" data-i18n="form.date">Date</label>
+                  <input type="date" id="entry-date" required aria-required="true" />
+                </div>
+                <div class="form-group">
+                  <label for="entry-score" data-i18n="form.score">Score</label>
+                  <input type="number" id="entry-score" required aria-required="true" />
+                </div>
+                <div class="form-group">
+                  <label for="entry-note" data-i18n="form.note">Note (Optional)</label>
+                  <textarea id="entry-note" aria-describedby="note-help"></textarea>
+                  <small id="note-help" class="sr-only">Add any specific context or feelings</small>
+                </div>
+                <button
+                  type="submit"
+                  class="btn btn-primary"
+                  data-i18n="form.save"
+                >
+                  Save Entry
+                </button>
+              </form>
+            </div>
+          </div>
+        </section>
+
+        <!-- History View -->
+        <section id="history-view" class="view" aria-labelledby="history-heading">
+          <div class="card">
+            <h2 id="history-heading" data-i18n="history.title">Your Log History</h2>
+            <p data-i18n="history.subtitle">Click on a column header to sort.</p>
+            <div class="table-container">
+              <table id="history-table" role="table" aria-label="Entry history">
+                <thead>
+                  <tr>
+                    <th data-sort="date" tabindex="0" role="columnheader" aria-sort="descending">
+                      <span data-i18n="history.table.date">Date</span>
+                      <span class="sort-indicator" aria-hidden="true">&darr;</span>
+                    </th>
+                    <th data-sort="domain" tabindex="0" role="columnheader">
+                      <span data-i18n="history.table.domain">Domain</span>
+                      <span class="sort-indicator" aria-hidden="true">&darr;</span>
+                    </th>
+                    <th data-sort="score" tabindex="0" role="columnheader">
+                      <span data-i18n="history.table.score">Score</span>
+                      <span class="sort-indicator" aria-hidden="true">&darr;</span>
+                    </th>
+                    <th data-sort="note" tabindex="0" role="columnheader">
+                      <span data-i18n="history.table.note">Note</span>
+                      <span class="sort-indicator" aria-hidden="true">&darr;</span>
+                    </th>
+                    <th data-i18n="history.table.actions">Actions</th>
+                  </tr>
+                </thead>
+                <tbody id="history-table-body"></tbody>
+              </table>
+            </div>
+          </div>
+        </section>
+
+        <!-- Import/Export View -->
+        <section id="import-export-view" class="view" aria-labelledby="import-export-heading">
+          <div class="card">
+            <h2 id="import-export-heading" data-i18n="importExport.title">Import / Export Data</h2>
+            <p data-i18n="importExport.exportSubtitle">
+              Save your data to a CSV file or import it from a previous backup. This is useful for moving data between devices.
+            </p>
+            <button
+              id="export-csv-btn"
+              class="btn btn-primary"
+              type="button"
+              data-i18n="importExport.exportBtn"
+            >
+              Export All Data as CSV
+            </button>
+          </div>
+          <div class="card" style="margin-top: 1.5rem">
+            <h3 data-i18n="importExport.importTitle">Import from CSV</h3>
+            <p data-i18n="importExport.importSubtitle">
+              Select a CSV file with columns: <code>id,date,domainKey,score,note</code>. New entries will be added to your existing log.
+            </p>
+            <input 
+              type="file" 
+              id="csv-import" 
+              accept=".csv" 
+              aria-describedby="import-help"
+            />
+            <small id="import-help" class="sr-only">Select a CSV file to import previous data</small>
+          </div>
+        </section>
+      </main>
+    </div>
+
+    <!-- Toast notifications -->
+    <div id="toast" class="toast" role="alert" aria-live="polite"></div>
+
+    <!-- Screen reader only styles -->
+    <style>
+      .sr-only {
+        position: absolute;
+        width: 1px;
+        height: 1px;
+        padding: 0;
+        margin: -1px;
+        overflow: hidden;
+        clip: rect(0, 0, 0, 0);
+        white-space: nowrap;
+        border: 0;
+      }
+    </style>
+
+    <!-- JavaScript - Load as modules -->
+    <script type="module" src="./js/app.js"></script>
+  </body>
+</html>

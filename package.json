@@ -1,0 +1,58 @@
+{
+  "name": "quickmh-log",
+  "version": "1.0.0",
+  "description": "A simple, private tool to track your mental health scores over time",
+  "type": "module",
+  "main": "src/index.html",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview",
+    "lint": "eslint src --ext js --report-unused-disable-directives --max-warnings 0",
+    "lint:fix": "eslint src --ext js --fix",
+    "format": "prettier --write src/**/*.{js,html,css}",
+    "format:check": "prettier --check src/**/*.{js,html,css}",
+    "test": "vitest",
+    "test:coverage": "vitest run --coverage",
+    "validate": "npm run lint && npm run format:check",
+    "serve": "python3 -m http.server 8000 --directory public"
+  },
+  "keywords": [
+    "mental-health",
+    "tracking",
+    "assessment",
+    "privacy",
+    "pwa",
+    "web-app"
+  ],
+  "author": "QuickMH Log",
+  "license": "MIT",
+  "devDependencies": {
+    "@vitejs/plugin-legacy": "^7.0.0",
+    "@vitest/coverage-v8": "^3.2.4",
+    "eslint": "^8.57.0",
+    "eslint-config-prettier": "^9.1.0",
+    "jsdom": "^26.1.0",
+    "prettier": "^3.3.3",
+    "terser": "^5.31.6",
+    "vite": "^7.0.4",
+    "vite-plugin-pwa": "^1.0.1",
+    "vitest": "^3.2.4"
+  },
+  "browserslist": [
+    "> 1%",
+    "last 2 versions",
+    "not dead"
+  ],
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/quickmh/log.git"
+  },
+  "bugs": {
+    "url": "https://github.com/quickmh/log/issues"
+  },
+  "homepage": "https://github.com/quickmh/log#readme"
+}
