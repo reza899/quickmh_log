@@ -1,12 +1,17 @@
+import type { PerformanceMetrics, MemoryUsage, ThrottledFunction, DebouncedFunction } from '../types/index.js';
+
 // Performance monitoring utilities
 export class PerformanceMonitor {
+  private metrics: Map<string, PerformanceMetrics>;
+  private isEnabled: boolean;
+
   constructor() {
-    this.metrics = new Map();
+    this.metrics = new Map<string, PerformanceMetrics>();
     this.isEnabled = 'performance' in window && 'mark' in performance;
   }
 
   // Start timing an operation
-  startTiming(name) {
+  startTiming(name: string): void {
     if (!this.isEnabled) {return;}
     
     const markName = `${name}-start`;
@@ -23,7 +28,7 @@ export class PerformanceMonitor {
   }
 
   // End timing an operation
-  endTiming(name) {
+  endTiming(name: string): void {
     if (!this.isEnabled) {return;}
     
     const startMark = `${name}-start`;
@@ -51,18 +56,18 @@ export class PerformanceMonitor {
   }
 
   // Get performance metrics
-  getMetrics(name) {
+  getMetrics(name: string): PerformanceMetrics | null {
     return this.metrics.get(name) || null;
   }
 
   // Get all metrics
-  getAllMetrics() {
+  getAllMetrics(): Record<string, PerformanceMetrics> {
     return Object.fromEntries(this.metrics);
   }
 
   // Report slow operations
-  getSlowOperations(threshold = 16) { // 16ms = 60fps threshold
-    const slowOps = [];
+  getSlowOperations(threshold: number = 16): Array<{name: string; averageTime: number; count: number}> {
+    const slowOps: Array<{name: string; averageTime: number; count: number}> = [];
     
     this.metrics.forEach((metrics, name) => {
       if (metrics.averageTime > threshold) {
@@ -78,20 +83,26 @@ export class PerformanceMonitor {
   }
 
   // Memory usage (if available)
-  getMemoryUsage() {
+  getMemoryUsage(): MemoryUsage | null {
     if ('memory' in performance) {
+      const memory = (performance as unknown as {memory: {
+        usedJSHeapSize: number;
+        totalJSHeapSize: number;
+        jsHeapSizeLimit: number;
+      }}).memory;
+      
       return {
-        usedJSHeapSize: performance.memory.usedJSHeapSize,
-        totalJSHeapSize: performance.memory.totalJSHeapSize,
-        jsHeapSizeLimit: performance.memory.jsHeapSizeLimit,
-        usagePercentage: (performance.memory.usedJSHeapSize / performance.memory.jsHeapSizeLimit) * 100
+        usedJSHeapSize: memory.usedJSHeapSize,
+        totalJSHeapSize: memory.totalJSHeapSize,
+        jsHeapSizeLimit: memory.jsHeapSizeLimit,
+        usagePercentage: (memory.usedJSHeapSize / memory.jsHeapSizeLimit) * 100
       };
     }
     return null;
   }
 
   // Reset metrics
-  reset() {
+  reset(): void {
     this.metrics.clear();
     if (this.isEnabled) {
       performance.clearMarks();
@@ -101,12 +112,16 @@ export class PerformanceMonitor {
 }
 
 // Debounce utility for performance optimization
-export function debounce(func, wait, immediate = false) {
-  let timeout;
+export function debounce<T extends unknown[]>(
+  func: (...args: T) => void, 
+  wait: number, 
+  immediate: boolean = false
+): DebouncedFunction<T> {
+  let timeout: NodeJS.Timeout | undefined;
   
-  return function executedFunction(...args) {
-    const later = () => {
-      timeout = null;
+  return function executedFunction(this: unknown, ...args: T): void {
+    const later = (): void => {
+      timeout = undefined;
       if (!immediate) {func.apply(this, args);}
     };
     
@@ -119,21 +134,27 @@ export function debounce(func, wait, immediate = false) {
 }
 
 // Throttle utility for performance optimization
-export function throttle(func, limit) {
-  let inThrottle;
+export function throttle<T extends unknown[]>(
+  func: (...args: T) => void, 
+  limit: number
+): ThrottledFunction<T> {
+  let inThrottle: boolean;
   
-  return function executedFunction(...args) {
+  return function executedFunction(this: unknown, ...args: T): void {
     if (!inThrottle) {
       func.apply(this, args);
       inThrottle = true;
-      setTimeout(() => inThrottle = false, limit);
+      setTimeout(() => { inThrottle = false; }, limit);
     }
   };
 }
 
 // Intersection Observer for lazy loading
 export class LazyLoader {
-  constructor(options = {}) {
+  private options: IntersectionObserverInit;
+  private observer: IntersectionObserver | null;
+
+  constructor(options: IntersectionObserverInit = {}) {
     this.options = {
       rootMargin: '50px',
       threshold: 0.1,
@@ -144,7 +165,7 @@ export class LazyLoader {
     this.init();
   }
 
-  init() {
+  private init(): void {
     if ('IntersectionObserver' in window) {
       this.observer = new IntersectionObserver(
         (entries) => this.handleIntersection(entries),
@@ -153,34 +174,35 @@ export class LazyLoader {
     }
   }
 
-  handleIntersection(entries) {
+  private handleIntersection(entries: IntersectionObserverEntry[]): void {
     entries.forEach(entry => {
       if (entry.isIntersecting) {
-        const element = entry.target;
-        const callback = element.dataset.lazyCallback;
+        const element = entry.target as HTMLElement;
+        const callback = element.dataset['lazyCallback'];
         
-        if (callback && window[callback]) {
-          window[callback](element);
+        if (callback && (window as unknown as Record<string, unknown>)[callback]) {
+          const callbackFn = (window as unknown as Record<string, unknown>)[callback] as (element: HTMLElement) => void;
+          callbackFn(element);
         }
         
-        this.observer.unobserve(element);
+        this.observer?.unobserve(element);
       }
     });
   }
 
-  observe(element) {
+  observe(element: Element): void {
     if (this.observer && element) {
       this.observer.observe(element);
     }
   }
 
-  unobserve(element) {
+  unobserve(element: Element): void {
     if (this.observer && element) {
       this.observer.unobserve(element);
     }
   }
 
-  disconnect() {
+  disconnect(): void {
     if (this.observer) {
       this.observer.disconnect();
     }
@@ -189,13 +211,17 @@ export class LazyLoader {
 
 // Performance-aware animation frame scheduler
 export class FrameScheduler {
+  private tasks: Array<{task: () => void; priority: number; id: number}>;
+  private isRunning: boolean;
+  private frameDeadline: number;
+
   constructor() {
     this.tasks = [];
     this.isRunning = false;
     this.frameDeadline = 16; // Target 60fps
   }
 
-  schedule(task, priority = 0) {
+  schedule(task: () => void, priority: number = 0): void {
     this.tasks.push({ task, priority, id: Date.now() });
     this.tasks.sort((a, b) => b.priority - a.priority);
     
@@ -204,20 +230,22 @@ export class FrameScheduler {
     }
   }
 
-  start() {
+  private start(): void {
     this.isRunning = true;
     requestAnimationFrame((timestamp) => this.processFrame(timestamp));
   }
 
-  processFrame(_timestamp) {
+  private processFrame(_timestamp: number): void {
     const frameStart = performance.now();
     
     while (this.tasks.length > 0 && (performance.now() - frameStart) < this.frameDeadline) {
-      const { task } = this.tasks.shift();
-      try {
-        task();
-      } catch (error) {
-        console.error('Scheduled task error:', error);
+      const taskItem = this.tasks.shift();
+      if (taskItem) {
+        try {
+          taskItem.task();
+        } catch (error) {
+          console.error('Scheduled task error:', error);
+        }
       }
     }
     
@@ -228,7 +256,7 @@ export class FrameScheduler {
     }
   }
 
-  clear() {
+  clear(): void {
     this.tasks = [];
     this.isRunning = false;
   }

@@ -1,4 +1,6 @@
-export const translations = {
+import type { Translations } from '../types/index.js';
+
+export const translations: Record<string, Translations> = {
   en: {
     appTitle: 'QuickMH Log',
     appSubtitle:

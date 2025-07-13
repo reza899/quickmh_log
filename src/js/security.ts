@@ -1,14 +1,18 @@
+import type { CSPViolation, BrowserFingerprint, SecurityValidationResult, ValidationInputType } from '../types/index.js';
+
 // Security utilities and Content Security Policy helpers
 export class SecurityManager {
+  private cspViolations: CSPViolation[];
+
   constructor() {
     this.cspViolations = [];
     this.setupCSPReporting();
   }
 
   // Content Security Policy violation reporting
-  setupCSPReporting() {
-    document.addEventListener('securitypolicyviolation', (event) => {
-      const violation = {
+  private setupCSPReporting(): void {
+    document.addEventListener('securitypolicyviolation', (event: SecurityPolicyViolationEvent) => {
+      const violation: CSPViolation = {
         timestamp: new Date().toISOString(),
         directive: event.violatedDirective,
         blockedURI: event.blockedURI,
@@ -29,14 +33,14 @@ export class SecurityManager {
   }
 
   // Get CSP violations for debugging
-  getCSPViolations() {
+  getCSPViolations(): CSPViolation[] {
     return this.cspViolations;
   }
 
   // Input sanitization
-  static sanitizeInput(input) {
+  static sanitizeInput(input: unknown): string {
     if (typeof input !== 'string') {
-      return input;
+      return String(input);
     }
 
     return input
@@ -48,7 +52,7 @@ export class SecurityManager {
   }
 
   // HTML sanitization (more aggressive)
-  static sanitizeHTML(html) {
+  static sanitizeHTML(html: unknown): string {
     if (typeof html !== 'string') {
       return '';
     }
@@ -60,7 +64,7 @@ export class SecurityManager {
   }
 
   // URL validation
-  static isValidURL(url) {
+  static isValidURL(url: string): boolean {
     try {
       const urlObj = new URL(url);
       // Only allow http and https protocols
@@ -71,7 +75,7 @@ export class SecurityManager {
   }
 
   // Check for malicious patterns in text
-  static containsMaliciousContent(text) {
+  static containsMaliciousContent(text: unknown): boolean {
     if (typeof text !== 'string') {
       return false;
     }
@@ -94,10 +98,10 @@ export class SecurityManager {
   }
 
   // Rate limiting for API calls
-  static createRateLimiter(maxCalls, timeWindow) {
-    const calls = [];
+  static createRateLimiter(maxCalls: number, timeWindow: number): <T>(fn: () => T) => T {
+    const calls: number[] = [];
     
-    return function(fn) {
+    return function<T>(fn: () => T): T {
       const now = Date.now();
       
       // Remove old calls outside the time window
@@ -115,19 +119,18 @@ export class SecurityManager {
   }
 
   // Generate secure random tokens
-  static generateSecureToken(length = 16) {
+  static generateSecureToken(length: number = 16): string {
     if (crypto && crypto.getRandomValues) {
       const array = new Uint8Array(length);
       crypto.getRandomValues(array);
       return Array.from(array, byte => byte.toString(16).padStart(2, '0')).join('');
     } 
-      // Fallback for older browsers
-      return Array.from({ length }, () => Math.floor(Math.random() * 16).toString(16)).join('');
-    
+    // Fallback for older browsers
+    return Array.from({ length }, () => Math.floor(Math.random() * 16).toString(16)).join('');
   }
 
   // Constant-time string comparison to prevent timing attacks
-  static constantTimeEquals(a, b) {
+  static constantTimeEquals(a: string, b: string): boolean {
     if (a.length !== b.length) {
       return false;
     }
@@ -141,8 +144,8 @@ export class SecurityManager {
   }
 
   // Browser fingerprinting detection
-  static detectBrowserFingerprinting() {
-    const fingerprint = {
+  static detectBrowserFingerprinting(): BrowserFingerprint {
+    const fingerprint: BrowserFingerprint = {
       userAgent: navigator.userAgent,
       language: navigator.language,
       platform: navigator.platform,
@@ -159,12 +162,15 @@ export class SecurityManager {
 
 // Secure localStorage wrapper
 export class SecureStorage {
-  constructor(keyPrefix = 'quickmh_') {
+  private keyPrefix: string;
+  private isAvailable: boolean;
+
+  constructor(keyPrefix: string = 'quickmh_') {
     this.keyPrefix = keyPrefix;
     this.isAvailable = this.checkAvailability();
   }
 
-  checkAvailability() {
+  private checkAvailability(): boolean {
     try {
       const test = '__storage_test__';
       localStorage.setItem(test, test);
@@ -176,22 +182,25 @@ export class SecureStorage {
   }
 
   // Encrypt data before storing (simple XOR for demonstration)
-  encrypt(data, key = 'default') {
+  private encrypt(data: unknown, key: string = 'default'): string {
+    let dataStr: string;
     if (typeof data !== 'string') {
-      data = JSON.stringify(data);
+      dataStr = JSON.stringify(data);
+    } else {
+      dataStr = data;
     }
 
     let result = '';
-    for (let i = 0; i < data.length; i++) {
+    for (let i = 0; i < dataStr.length; i++) {
       result += String.fromCharCode(
-        data.charCodeAt(i) ^ key.charCodeAt(i % key.length)
+        dataStr.charCodeAt(i) ^ key.charCodeAt(i % key.length)
       );
     }
     return btoa(result); // Base64 encode
   }
 
   // Decrypt data after retrieving
-  decrypt(encryptedData, key = 'default') {
+  private decrypt(encryptedData: string, key: string = 'default'): string | null {
     try {
       const data = atob(encryptedData); // Base64 decode
       let result = '';
@@ -206,18 +215,20 @@ export class SecureStorage {
     }
   }
 
-  setItem(key, value, encrypt = false) {
+  setItem(key: string, value: unknown, encrypt: boolean = false): boolean {
     if (!this.isAvailable) {
       throw new Error('Storage not available');
     }
 
     const fullKey = this.keyPrefix + key;
-    let dataToStore = value;
+    let dataToStore: string;
 
     if (encrypt) {
       dataToStore = this.encrypt(value);
     } else if (typeof value !== 'string') {
       dataToStore = JSON.stringify(value);
+    } else {
+      dataToStore = value;
     }
 
     try {
@@ -229,7 +240,7 @@ export class SecureStorage {
     }
   }
 
-  getItem(key, decrypt = false) {
+  getItem<T = unknown>(key: string, decrypt: boolean = false): T | null {
     if (!this.isAvailable) {
       return null;
     }
@@ -237,21 +248,26 @@ export class SecureStorage {
     const fullKey = this.keyPrefix + key;
     try {
       const value = localStorage.getItem(fullKey);
-      if (value === null) {return null;}
+      if (value === null) {
+        return null;
+      }
 
       if (decrypt) {
         const decrypted = this.decrypt(value);
+        if (decrypted === null) {
+          return null;
+        }
         try {
-          return JSON.parse(decrypted);
+          return JSON.parse(decrypted) as T;
         } catch {
-          return decrypted;
+          return decrypted as T;
         }
       }
 
       try {
-        return JSON.parse(value);
+        return JSON.parse(value) as T;
       } catch {
-        return value;
+        return value as T;
       }
     } catch (error) {
       console.error('Failed to retrieve data:', error);
@@ -259,7 +275,7 @@ export class SecureStorage {
     }
   }
 
-  removeItem(key) {
+  removeItem(key: string): boolean {
     if (!this.isAvailable) {
       return false;
     }
@@ -274,14 +290,14 @@ export class SecureStorage {
     }
   }
 
-  clear() {
+  clear(): boolean {
     if (!this.isAvailable) {
       return false;
     }
 
     try {
       // Only remove items with our prefix
-      const keysToRemove = [];
+      const keysToRemove: string[] = [];
       for (let i = 0; i < localStorage.length; i++) {
         const key = localStorage.key(i);
         if (key && key.startsWith(this.keyPrefix)) {
@@ -300,7 +316,11 @@ export class SecureStorage {
 
 // Input validation security wrapper
 export class SecureValidator {
-  static validateAndSanitize(input, type = 'text', options = {}) {
+  static validateAndSanitize(
+    input: unknown, 
+    type: ValidationInputType = 'text', 
+    options: { maxLength?: number; minLength?: number } = {}
+  ): SecurityValidationResult {
     if (input === null || input === undefined) {
       return { isValid: false, sanitized: '', error: 'Input is required' };
     }

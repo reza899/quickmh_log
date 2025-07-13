@@ -4,7 +4,7 @@ import legacy from '@vitejs/plugin-legacy';
 export default defineConfig({
   root: 'src',
   build: {
-    outDir: '../public',
+    outDir: '../dist',
     emptyOutDir: true,
     minify: 'terser',
     sourcemap: true,
@@ -29,5 +29,13 @@ export default defineConfig({
   ],
   define: {
     __APP_VERSION__: JSON.stringify(process.env.npm_package_version || '1.0.0')
+  },
+  resolve: {
+    alias: {
+      '@': '/src'
+    }
+  },
+  esbuild: {
+    target: 'es2018'
   }
 });

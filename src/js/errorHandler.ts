@@ -1,17 +1,23 @@
+import type { ErrorInfo, ValidationRule, ValidationResult, ValidationFunction } from '../types/index.js';
+
 // Centralized error handling and logging
 export class ErrorHandler {
+  private errors: ErrorInfo[];
+  private maxErrors: number;
+  private isProduction: boolean;
+
   constructor() {
     this.errors = [];
     this.maxErrors = 100; // Keep only the last 100 errors
-    this.isProduction = import.meta.env.PROD;
+    this.isProduction = (import.meta as unknown as { env: { PROD: boolean } }).env.PROD;
     
     // Setup global error handlers
     this.setupGlobalHandlers();
   }
 
-  setupGlobalHandlers() {
+  private setupGlobalHandlers(): void {
     // Handle uncaught JavaScript errors
-    window.addEventListener('error', (event) => {
+    window.addEventListener('error', (event: ErrorEvent) => {
       this.logError('JavaScript Error', {
         message: event.message,
         filename: event.filename,
@@ -22,7 +28,7 @@ export class ErrorHandler {
     });
 
     // Handle unhandled promise rejections
-    window.addEventListener('unhandledrejection', (event) => {
+    window.addEventListener('unhandledrejection', (event: PromiseRejectionEvent) => {
       this.logError('Unhandled Promise Rejection', {
         reason: event.reason,
         stack: event.reason?.stack
@@ -30,8 +36,8 @@ export class ErrorHandler {
     });
   }
 
-  logError(type, details) {
-    const error = {
+  logError(type: string, details: Record<string, unknown>): void {
+    const error: ErrorInfo = {
       id: Date.now().toString(),
       timestamp: new Date().toISOString(),
       type,
@@ -57,7 +63,7 @@ export class ErrorHandler {
   }
 
   // Application-specific error types
-  logStorageError(operation, error) {
+  logStorageError(operation: string, error: Error): void {
     this.logError('Storage Error', {
       operation,
       error: error.message,
@@ -65,7 +71,7 @@ export class ErrorHandler {
     });
   }
 
-  logValidationError(field, value, rule) {
+  logValidationError(field: string, value: unknown, rule: string): void {
     this.logError('Validation Error', {
       field,
       value: typeof value === 'string' ? value.substring(0, 100) : value,
@@ -73,7 +79,7 @@ export class ErrorHandler {
     });
   }
 
-  logNetworkError(url, error) {
+  logNetworkError(url: string, error: Error): void {
     this.logError('Network Error', {
       url,
       error: error.message,
@@ -81,7 +87,7 @@ export class ErrorHandler {
     });
   }
 
-  logRenderError(component, error) {
+  logRenderError(component: string, error: Error): void {
     this.logError('Render Error', {
       component,
       error: error.message,
@@ -90,10 +96,14 @@ export class ErrorHandler {
   }
 
   // Get error statistics
-  getErrorStats() {
+  getErrorStats(): {
+    total: number;
+    byType: Record<string, number>;
+    recent: ErrorInfo[];
+  } {
     const stats = {
       total: this.errors.length,
-      byType: {},
+      byType: {} as Record<string, number>,
       recent: this.errors.slice(-10)
     };
 
@@ -105,58 +115,59 @@ export class ErrorHandler {
   }
 
   // Clear error log
-  clearErrors() {
+  clearErrors(): void {
     this.errors = [];
   }
 
   // Export errors for debugging
-  exportErrors() {
+  exportErrors(): string {
     return JSON.stringify(this.errors, null, 2);
   }
 }
 
 // Input validation utilities
 export class Validator {
-  static isRequired(value) {
+  static isRequired(value: unknown): boolean {
     return value !== null && value !== undefined && value !== '';
   }
 
-  static isNumber(value) {
-    return !isNaN(value) && !isNaN(parseFloat(value));
+  static isNumber(value: unknown): boolean {
+    return !isNaN(value as number) && !isNaN(parseFloat(value as string));
   }
 
-  static isInteger(value) {
+  static isInteger(value: unknown): boolean {
     return Number.isInteger(Number(value));
   }
 
-  static isInRange(value, min, max) {
+  static isInRange(value: unknown, min: number, max: number): boolean {
     const num = Number(value);
     return num >= min && num <= max;
   }
 
-  static isDate(value) {
-    const date = new Date(value);
-    return date instanceof Date && !isNaN(date);
+  static isDate(value: unknown): boolean {
+    const date = new Date(value as string);
+    return date instanceof Date && !isNaN(date.getTime());
   }
 
-  static isValidDomainKey(key, availableDomains) {
+  static isValidDomainKey(key: string, availableDomains: Record<string, unknown>): boolean {
     return availableDomains && Object.prototype.hasOwnProperty.call(availableDomains, key);
   }
 
-  static maxLength(value, max) {
+  static maxLength(value: unknown, max: number): boolean {
     return typeof value === 'string' && value.length <= max;
   }
 
-  static minLength(value, min) {
+  static minLength(value: unknown, min: number): boolean {
     return typeof value === 'string' && value.length >= min;
   }
 
-  static isEmail(value) {
+  static isEmail(value: unknown): boolean {
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    return emailRegex.test(value);
+    return typeof value === 'string' && emailRegex.test(value);
   }
 
-  static isSafeString(value) {
+  static isSafeString(value: unknown): boolean {
+    if (typeof value !== 'string') return true;
     // Check for potentially dangerous characters
     const dangerousChars = /<script|javascript:|on\w+=/i;
     return !dangerousChars.test(value);
@@ -165,22 +176,25 @@ export class Validator {
 
 // Form validation helper
 export class FormValidator {
-  constructor(errorHandler) {
-    this.errorHandler = errorHandler;
-    this.rules = new Map();
+  private errorHandler: ErrorHandler | null;
+  private rules: Map<string, ValidationRule[]>;
+
+  constructor(errorHandler?: ErrorHandler) {
+    this.errorHandler = errorHandler || null;
+    this.rules = new Map<string, ValidationRule[]>();
   }
 
-  addRule(field, validators) {
+  addRule(field: string, validators: ValidationRule[]): void {
     this.rules.set(field, validators);
   }
 
-  validate(data) {
-    const errors = {};
+  validate(data: Record<string, unknown>): ValidationResult {
+    const errors: Record<string, string[]> = {};
     let isValid = true;
 
     for (const [field, validators] of this.rules) {
       const value = data[field];
-      const fieldErrors = [];
+      const fieldErrors: string[] = [];
 
       for (const validator of validators) {
         try {
@@ -200,7 +214,7 @@ export class FormValidator {
             this.errorHandler.logError('Validator Error', {
               field,
               validator: validator.message,
-              error: error.message
+              error: (error as Error).message
             });
           }
         }
@@ -215,42 +229,42 @@ export class FormValidator {
   }
 
   // Common validation rule builders
-  static required(message = 'This field is required') {
+  static required(message: string = 'This field is required'): ValidationRule {
     return {
-      validate: (value) => Validator.isRequired(value),
+      validate: (value: unknown) => Validator.isRequired(value),
       message
     };
   }
 
-  static number(message = 'Must be a valid number') {
+  static number(message: string = 'Must be a valid number'): ValidationRule {
     return {
-      validate: (value) => Validator.isNumber(value),
+      validate: (value: unknown) => Validator.isNumber(value),
       message
     };
   }
 
-  static range(min, max, message = `Must be between ${min} and ${max}`) {
+  static range(min: number, max: number, message: string = `Must be between ${min} and ${max}`): ValidationRule {
     return {
-      validate: (value) => Validator.isInRange(value, min, max),
+      validate: (value: unknown) => Validator.isInRange(value, min, max),
       message
     };
   }
 
-  static maxLength(max, message = `Must not exceed ${max} characters`) {
+  static maxLength(max: number, message: string = `Must not exceed ${max} characters`): ValidationRule {
     return {
-      validate: (value) => Validator.maxLength(value, max),
+      validate: (value: unknown) => Validator.maxLength(value, max),
       message
     };
   }
 
-  static date(message = 'Must be a valid date') {
+  static date(message: string = 'Must be a valid date'): ValidationRule {
     return {
-      validate: (value) => Validator.isDate(value),
+      validate: (value: unknown) => Validator.isDate(value),
       message
     };
   }
 
-  static custom(validateFn, message) {
+  static custom(validateFn: ValidationFunction, message: string): ValidationRule {
     return {
       validate: validateFn,
       message
@@ -260,14 +274,18 @@ export class FormValidator {
 
 // Retry mechanism for failed operations
 export class RetryHandler {
-  static async withRetry(operation, maxRetries = 3, delay = 1000) {
-    let lastError;
+  static async withRetry<T>(
+    operation: () => Promise<T>, 
+    maxRetries: number = 3, 
+    delay: number = 1000
+  ): Promise<T> {
+    let lastError: Error;
     
     for (let attempt = 1; attempt <= maxRetries; attempt++) {
       try {
         return await operation();
       } catch (error) {
-        lastError = error;
+        lastError = error as Error;
         
         if (attempt === maxRetries) {
           throw error;
@@ -279,21 +297,21 @@ export class RetryHandler {
       }
     }
     
-    throw lastError;
+    throw lastError!;
   }
 }
 
 // Safe JSON operations
 export class SafeJSON {
-  static parse(str, defaultValue = null) {
+  static parse<T = unknown>(str: string, defaultValue: T | null = null): T | null {
     try {
-      return JSON.parse(str);
+      return JSON.parse(str) as T;
     } catch {
       return defaultValue;
     }
   }
 
-  static stringify(obj, defaultValue = '{}') {
+  static stringify(obj: unknown, defaultValue: string = '{}'): string {
     try {
       return JSON.stringify(obj);
     } catch {
